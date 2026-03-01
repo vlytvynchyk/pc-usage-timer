@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
+    <RootNamespace>PcUsageTimer</RootNamespace>
+    <AssemblyName>PcUsageTimer</AssemblyName>
+    <Nullable>enable</Nullable>
+
+    <!-- Publish as single self-contained exe -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+
+    <!-- App metadata -->
+    <Version>1.0.0</Version>
+    <Authors>PC Usage Timer Contributors</Authors>
+    <Product>PC Usage Timer</Product>
+    <Description>Parental control app that enforces screen-time limits for kids</Description>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app-icon.png" />
+  </ItemGroup>
+
+</Project>

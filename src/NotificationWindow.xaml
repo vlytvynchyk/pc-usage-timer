@@ -1,0 +1,26 @@
+<Window x:Class="PcUsageTimer.NotificationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
+        Loaded="Window_Loaded">
+
+    <Border Background="#313244" CornerRadius="12" Padding="20,14"
+            BorderBrush="#45475A" BorderThickness="1" Margin="10"
+            MinWidth="280">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="20" Opacity="0.5" ShadowDepth="4"/>
+        </Border.Effect>
+
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#x23F0;" FontSize="30" VerticalAlignment="Center" Margin="0,0,14,0"/>
+
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock x:Name="TitleText" Text="Time Warning" FontSize="16"
+                           FontWeight="Bold" Foreground="#F9E2AF"/>
+                <TextBlock x:Name="MessageText" Text="3 minutes remaining"
+                           FontSize="14" Foreground="#A6ADC8" Margin="0,3,0,0"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

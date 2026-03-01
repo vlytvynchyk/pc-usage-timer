@@ -1,0 +1,127 @@
+<Window x:Class="PcUsageTimer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PC Usage Timer" Height="580" Width="420"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        SizeToContent="Height"
+        Icon="Assets/app-icon.png"
+        Background="#1E1E2E">
+
+    <Window.Resources>
+        <Style x:Key="PresetButton" TargetType="Button">
+            <Setter Property="Background" Value="#89B4FA"/>
+            <Setter Property="Foreground" Value="#1E1E2E"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#B4D0FB"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#6A9BF5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Background" Value="#A6E3A1"/>
+            <Setter Property="Foreground" Value="#1E1E2E"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="55"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#C6F0C1"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#86D381"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="StopButton" TargetType="Button" BasedOn="{StaticResource ActionButton}">
+            <Setter Property="Background" Value="#F38BA8"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F5A3B8"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <!-- Setup Panel -->
+        <StackPanel x:Name="SetupPanel">
+            <TextBlock Text="PC Usage Timer" FontSize="28" FontWeight="Bold"
+                       Foreground="#CDD6F4" HorizontalAlignment="Center" Margin="0,0,0,25"/>
+
+            <TextBlock Text="Select Duration" FontSize="16" Foreground="#A6ADC8" Margin="0,0,0,10"/>
+
+            <UniformGrid Columns="3">
+                <Button Content="10 min" Style="{StaticResource PresetButton}" Click="PresetButton_Click" Tag="10"/>
+                <Button Content="20 min" Style="{StaticResource PresetButton}" Click="PresetButton_Click" Tag="20"/>
+                <Button Content="30 min" Style="{StaticResource PresetButton}" Click="PresetButton_Click" Tag="30"/>
+            </UniformGrid>
+
+            <TextBlock Text="Or enter custom minutes:" FontSize="14" Foreground="#A6ADC8" Margin="0,15,0,5"/>
+            <TextBox x:Name="CustomMinutesBox" FontSize="18" Height="40" Background="#313244"
+                     Foreground="#CDD6F4" BorderBrush="#45475A" CaretBrush="#CDD6F4"
+                     VerticalContentAlignment="Center" Padding="10,0"
+                     PreviewTextInput="NumericOnly_PreviewTextInput"/>
+
+            <TextBlock Text="Set PIN (4 digits)" FontSize="16" Foreground="#A6ADC8" Margin="0,20,0,5"/>
+            <PasswordBox x:Name="PinBox" FontSize="18" Height="40" MaxLength="4"
+                         Background="#313244" Foreground="#CDD6F4" BorderBrush="#45475A"
+                         CaretBrush="#CDD6F4" VerticalContentAlignment="Center" Padding="10,0"/>
+
+            <TextBlock Text="Confirm PIN" FontSize="16" Foreground="#A6ADC8" Margin="0,10,0,5"/>
+            <PasswordBox x:Name="PinConfirmBox" FontSize="18" Height="40" MaxLength="4"
+                         Background="#313244" Foreground="#CDD6F4" BorderBrush="#45475A"
+                         CaretBrush="#CDD6F4" VerticalContentAlignment="Center" Padding="10,0"/>
+
+            <TextBlock x:Name="ErrorText" FontSize="14" Foreground="#F38BA8"
+                       Margin="0,10,0,0" TextWrapping="Wrap"/>
+
+            <Button Content="START TIMER" Style="{StaticResource ActionButton}"
+                    Margin="0,20,0,0" Click="StartButton_Click"/>
+        </StackPanel>
+
+        <!-- Timer Running Panel -->
+        <StackPanel x:Name="TimerPanel" Visibility="Collapsed" VerticalAlignment="Center">
+            <TextBlock Text="Time Remaining" FontSize="22" Foreground="#A6ADC8"
+                       HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+            <TextBlock x:Name="CountdownText" Text="00:00" FontSize="72" FontWeight="Bold"
+                       Foreground="#89B4FA" HorizontalAlignment="Center" Margin="0,0,0,30"/>
+
+            <Button Content="STOP TIMER" Style="{StaticResource StopButton}"
+                    Click="StopButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
