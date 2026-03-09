@@ -12,6 +12,8 @@ namespace PcUsageTimer;
 public partial class LockScreenWindow : Window
 {
     private bool _unlocked;
+    private int _failedAttempts;
+    private DateTime _lockoutUntil = DateTime.MinValue;
     private IntPtr _hookId = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc;
 
@@ -154,8 +156,18 @@ public partial class LockScreenWindow : Window
 
     private void TryUnlock()
     {
+        if (DateTime.UtcNow < _lockoutUntil)
+        {
+            var wait = (int)Math.Ceiling((_lockoutUntil - DateTime.UtcNow).TotalSeconds);
+            ErrorText.Text = $"Too many attempts. Wait {wait}s.";
+            PinEntry.Password = "";
+            PinEntry.Focus();
+            return;
+        }
+
         if (PinManager.Validate(PinEntry.Password))
         {
+            _failedAttempts = 0;
             _unlocked = true;
 
             // Remove keyboard hook
@@ -172,7 +184,17 @@ public partial class LockScreenWindow : Window
         }
         else
         {
-            ErrorText.Text = "Wrong PIN. Try again.";
+            _failedAttempts++;
+            if (_failedAttempts >= 3)
+            {
+                var delay = _failedAttempts >= 9 ? 60 : _failedAttempts >= 6 ? 15 : 5;
+                _lockoutUntil = DateTime.UtcNow.AddSeconds(delay);
+                ErrorText.Text = $"Wrong PIN. Locked for {delay}s.";
+            }
+            else
+            {
+                ErrorText.Text = "Wrong PIN. Try again.";
+            }
             PinEntry.Password = "";
             PinEntry.Focus();
 

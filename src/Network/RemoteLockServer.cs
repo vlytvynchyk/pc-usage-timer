@@ -15,6 +15,8 @@ public class RemoteLockServer : IDisposable
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private int _failedAttempts;
+    private DateTime _lockoutUntil = DateTime.MinValue;
 
     public event Action? LockRequested;
     public event Action<int>? TimerStartRequested;
@@ -290,13 +292,29 @@ public class RemoteLockServer : IDisposable
 
     private bool ValidatePin(string? pin, HttpListenerResponse response)
     {
+        if (DateTime.UtcNow < _lockoutUntil)
+        {
+            var wait = (int)Math.Ceiling((_lockoutUntil - DateTime.UtcNow).TotalSeconds);
+            response.StatusCode = 429;
+            WriteJson(response, new { success = false, error = $"Too many attempts. Wait {wait}s." });
+            return false;
+        }
+
         if (string.IsNullOrEmpty(pin) || !PinManager.HasPin || !PinManager.Validate(pin))
         {
+            _failedAttempts++;
+            if (_failedAttempts >= 3)
+            {
+                var delay = _failedAttempts >= 9 ? 60 : _failedAttempts >= 6 ? 15 : 5;
+                _lockoutUntil = DateTime.UtcNow.AddSeconds(delay);
+            }
             response.StatusCode = 403;
             var error = !PinManager.HasPin ? "No PIN set. Start a timer on the PC first." : "Wrong PIN";
             WriteJson(response, new { success = false, error });
             return false;
         }
+
+        _failedAttempts = 0;
         return true;
     }
 
