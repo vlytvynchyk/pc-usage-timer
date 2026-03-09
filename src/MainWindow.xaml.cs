@@ -1,9 +1,13 @@
 using System;
 using System.ComponentModel;
+using System.Drawing;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using PcUsageTimer.Network;
 
 namespace PcUsageTimer;
 
@@ -15,13 +19,85 @@ public partial class MainWindow : Window
     private string _pin = "";
     private bool _notified3Min;
     private bool _notified1Min;
-
     private bool _timerRunning;
+    private bool _lockScreenActive;
+
+    private RemoteLockServer? _remoteLockServer;
+    private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private bool _forceClose;
+
+    private const int RemotePort = 7742;
+    private const string AutoStartRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+    private const string AutoStartValueName = "PcUsageTimer";
+
+    private static readonly string PinFilePath = System.IO.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "PcUsageTimer", "pin.dat");
 
     public MainWindow()
     {
         InitializeComponent();
         Closing += MainWindow_Closing;
+        SetupTrayIcon();
+        LoadAutoStartSetting();
+        StartRemoteServer();
+    }
+
+    // ── Tray Icon ──────────────────────────────────────────────
+
+    private void SetupTrayIcon()
+    {
+        _trayIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "PC Usage Timer",
+            Visible = true
+        };
+
+        // Use the embedded icon from the exe, fall back to system icon
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (exePath != null)
+                _trayIcon.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
+        }
+        catch
+        {
+            _trayIcon.Icon = SystemIcons.Application;
+        }
+
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Open", null, (_, _) => ShowFromTray());
+        menu.Items.Add("Exit", null, (_, _) =>
+        {
+            if (_timerRunning)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "Cannot exit while timer is running. Stop the timer first.",
+                    "PC Usage Timer",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+            _forceClose = true;
+            Close();
+        });
+        _trayIcon.ContextMenuStrip = menu;
+        _trayIcon.DoubleClick += (_, _) => ShowFromTray();
+    }
+
+    private void ShowFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            Hide();
+        }
     }
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -29,8 +105,129 @@ public partial class MainWindow : Window
         if (_timerRunning)
         {
             e.Cancel = true;
+            return;
+        }
+
+        if (!_forceClose)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
+        // Actually closing — clean up
+        _remoteLockServer?.Dispose();
+        _trayIcon?.Dispose();
+        Application.Current.Shutdown();
+    }
+
+    // ── PIN Persistence ──────────────────────────────────────
+
+    private string LoadSavedPin()
+    {
+        try
+        {
+            if (System.IO.File.Exists(PinFilePath))
+                return System.IO.File.ReadAllText(PinFilePath).Trim();
+        }
+        catch { }
+        return "";
+    }
+
+    private void SavePin(string pin)
+    {
+        try
+        {
+            var dir = System.IO.Path.GetDirectoryName(PinFilePath)!;
+            System.IO.Directory.CreateDirectory(dir);
+            System.IO.File.WriteAllText(PinFilePath, pin);
+        }
+        catch { }
+    }
+
+    // ── Remote Lock Server ─────────────────────────────────────
+
+    private void StartRemoteServer()
+    {
+        _pin = LoadSavedPin();
+        _remoteLockServer = new RemoteLockServer(RemotePort, _pin, GetTimerStatus);
+        _remoteLockServer.LockRequested += OnRemoteLockRequested;
+
+        try
+        {
+            _remoteLockServer.Start();
+            var url = _remoteLockServer.ServerUrl ?? "unavailable";
+            RemoteLockStatusText.Text = string.IsNullOrEmpty(_pin)
+                ? "Start a timer once to set your PIN, then open on your phone:"
+                : "Open on your phone:";
+            RemoteLockUrlText.Text = url;
+        }
+        catch (Exception ex)
+        {
+            RemoteLockStatusText.Text = $"Remote lock unavailable: {ex.Message}";
+            RemoteLockUrlText.Text = "";
         }
     }
+
+    private TimerStatus GetTimerStatus()
+    {
+        // Called from background thread — read volatile state
+        return new TimerStatus(_timerRunning, _timerRunning ? _remaining : null, _lockScreenActive);
+    }
+
+    private void OnRemoteLockRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_lockScreenActive) return;
+
+            if (_timerRunning)
+            {
+                _timer?.Stop();
+                _remaining = TimeSpan.Zero;
+                UpdateCountdownDisplay();
+            }
+
+            ShowLockScreen();
+        });
+    }
+
+    // ── Auto-Start ─────────────────────────────────────────────
+
+    private void LoadAutoStartSetting()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, false);
+            AutoStartCheckBox.IsChecked = key?.GetValue(AutoStartValueName) != null;
+        }
+        catch
+        {
+            AutoStartCheckBox.IsChecked = false;
+        }
+    }
+
+    private void AutoStartCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(AutoStartRegistryKey, true);
+            if (key == null) return;
+
+            if (AutoStartCheckBox.IsChecked == true)
+            {
+                var exePath = Environment.ProcessPath ?? "";
+                key.SetValue(AutoStartValueName, $"\"{exePath}\" --minimized");
+            }
+            else
+            {
+                key.DeleteValue(AutoStartValueName, false);
+            }
+        }
+        catch { }
+    }
+
+    // ── Timer Setup & Control ──────────────────────────────────
 
     private void PresetButton_Click(object sender, RoutedEventArgs e)
     {
@@ -49,14 +246,12 @@ public partial class MainWindow : Window
     {
         ErrorText.Text = "";
 
-        // Validate minutes
         if (!int.TryParse(CustomMinutesBox.Text, out var minutes) || minutes < 1 || minutes > 480)
         {
             ErrorText.Text = "Enter a valid duration (1–480 minutes).";
             return;
         }
 
-        // Validate PIN
         var pin = PinBox.Password;
         var pinConfirm = PinConfirmBox.Password;
 
@@ -78,9 +273,13 @@ public partial class MainWindow : Window
         _notified3Min = false;
         _notified1Min = false;
 
-        // Switch to timer view
+        // Update the remote server's PIN and persist it
+        _remoteLockServer?.UpdatePin(_pin);
+        SavePin(_pin);
+
         SetupPanel.Visibility = Visibility.Collapsed;
         TimerPanel.Visibility = Visibility.Visible;
+        TimerRemoteLockUrl.Text = _remoteLockServer?.ServerUrl ?? "";
         UpdateCountdownDisplay();
 
         _timerRunning = true;
@@ -104,7 +303,6 @@ public partial class MainWindow : Window
 
         UpdateCountdownDisplay();
 
-        // Show notifications at 3 min and 1 min (only if total > 5 min)
         if (_totalMinutes > 5)
         {
             if (!_notified3Min && _remaining.TotalSeconds <= 180 && _remaining.TotalSeconds > 179)
@@ -135,12 +333,13 @@ public partial class MainWindow : Window
 
     private void ShowLockScreen()
     {
+        _lockScreenActive = true;
         var lockScreen = new LockScreenWindow(_pin);
         lockScreen.Show();
 
-        // When lock screen is closed (PIN entered), return to setup
         lockScreen.Closed += (_, _) =>
         {
+            _lockScreenActive = false;
             _timerRunning = false;
             SetupPanel.Visibility = Visibility.Visible;
             TimerPanel.Visibility = Visibility.Collapsed;
@@ -155,7 +354,6 @@ public partial class MainWindow : Window
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
     {
-        // Stopping requires the PIN too
         var dialog = new PinPromptDialog(_pin) { Owner = this };
         if (dialog.ShowDialog() == true)
         {

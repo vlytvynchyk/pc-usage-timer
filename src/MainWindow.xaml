@@ -5,7 +5,8 @@
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         SizeToContent="Height"
         Icon="Assets/app-icon.png"
-        Background="#1E1E2E">
+        Background="#1E1E2E"
+        StateChanged="Window_StateChanged">
 
     <Window.Resources>
         <Style x:Key="PresetButton" TargetType="Button">
@@ -110,6 +111,23 @@
 
             <Button Content="START TIMER" Style="{StaticResource ActionButton}"
                     Margin="0,20,0,0" Click="StartButton_Click"/>
+
+            <!-- Remote Lock Server Info -->
+            <Border Background="#313244" CornerRadius="8" Padding="12" Margin="0,20,0,0">
+                <StackPanel>
+                    <TextBlock Text="Remote Lock" FontSize="16" FontWeight="Bold"
+                               Foreground="#CDD6F4" Margin="0,0,0,5"/>
+                    <TextBlock x:Name="RemoteLockStatusText" FontSize="13" Foreground="#A6ADC8"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="RemoteLockUrlText" FontSize="15" Foreground="#89B4FA"
+                               FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Auto-Start -->
+            <CheckBox x:Name="AutoStartCheckBox" Content="Start with Windows"
+                      Foreground="#A6ADC8" FontSize="14" Margin="0,12,0,0"
+                      Checked="AutoStartCheckBox_Changed" Unchecked="AutoStartCheckBox_Changed"/>
         </StackPanel>
 
         <!-- Timer Running Panel -->
@@ -122,6 +140,14 @@
 
             <Button Content="STOP TIMER" Style="{StaticResource StopButton}"
                     Click="StopButton_Click"/>
+
+            <Border Background="#313244" CornerRadius="8" Padding="12" Margin="0,20,0,0">
+                <StackPanel>
+                    <TextBlock Text="Remote Lock" FontSize="14" Foreground="#A6ADC8"/>
+                    <TextBlock x:Name="TimerRemoteLockUrl" FontSize="14" Foreground="#89B4FA"
+                               FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </Grid>
 </Window>
