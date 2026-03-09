@@ -416,6 +416,7 @@ public partial class MainWindow : Window
             {
                 _notified1Min = true;
                 ShowNotification("1 minute left", "Screen time ends in 1 minute!");
+                System.Media.SystemSounds.Exclamation.Play();
             }
         }
     }
