@@ -29,4 +29,8 @@
     <Resource Include="Assets\app-icon.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.7.0" />
+  </ItemGroup>
+
 </Project>

@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using PcUsageTimer.Network;
+using QRCoder;
 
 namespace PcUsageTimer;
 
@@ -165,12 +166,34 @@ public partial class MainWindow : Window
                 ? "Start a timer once to set your PIN, then open on your phone:"
                 : "Open on your phone:";
             RemoteLockUrlText.Text = url;
+            GenerateQrCode(url);
         }
         catch (Exception ex)
         {
             RemoteLockStatusText.Text = $"Remote lock unavailable: {ex.Message}";
             RemoteLockUrlText.Text = "";
         }
+    }
+
+    private void GenerateQrCode(string url)
+    {
+        try
+        {
+            using var qrGenerator = new QRCodeGenerator();
+            using var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
+            using var qrCode = new BitmapByteQRCode(qrData);
+            var pngBytes = qrCode.GetGraphic(5, [205, 214, 244], [30, 30, 46]);
+
+            var image = new System.Windows.Media.Imaging.BitmapImage();
+            using var ms = new System.IO.MemoryStream(pngBytes);
+            image.BeginInit();
+            image.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            image.StreamSource = ms;
+            image.EndInit();
+            image.Freeze();
+            QrCodeImage.Source = image;
+        }
+        catch { }
     }
 
     private TimerStatus GetTimerStatus()

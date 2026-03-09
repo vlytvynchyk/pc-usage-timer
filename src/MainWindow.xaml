@@ -121,6 +121,8 @@
                                TextWrapping="Wrap"/>
                     <TextBlock x:Name="RemoteLockUrlText" FontSize="15" Foreground="#89B4FA"
                                FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <Image x:Name="QrCodeImage" Width="150" Height="150" Margin="0,8,0,0"
+                           HorizontalAlignment="Left"/>
                 </StackPanel>
             </Border>
 
