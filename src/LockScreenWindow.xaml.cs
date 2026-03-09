@@ -142,6 +142,18 @@ public partial class LockScreenWindow : Window
         TryUnlock();
     }
 
+    public void RemoteUnlock()
+    {
+        _unlocked = true;
+        if (_hookId != IntPtr.Zero)
+        {
+            UnhookWindowsHookEx(_hookId);
+            _hookId = IntPtr.Zero;
+        }
+        AudioManager.Unmute();
+        Close();
+    }
+
     private void TryUnlock()
     {
         if (PinEntry.Password == _pin)

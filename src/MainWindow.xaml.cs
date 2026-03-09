@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool _notified1Min;
     private bool _timerRunning;
     private bool _lockScreenActive;
+    private LockScreenWindow? _activeLockScreen;
 
     private RemoteLockServer? _remoteLockServer;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
@@ -152,6 +153,9 @@ public partial class MainWindow : Window
         _pin = LoadSavedPin();
         _remoteLockServer = new RemoteLockServer(RemotePort, _pin, GetTimerStatus);
         _remoteLockServer.LockRequested += OnRemoteLockRequested;
+        _remoteLockServer.TimerStartRequested += OnRemoteTimerStartRequested;
+        _remoteLockServer.UnlockRequested += OnRemoteUnlockRequested;
+        _remoteLockServer.ExtendRequested += OnRemoteExtendRequested;
 
         try
         {
@@ -189,6 +193,48 @@ public partial class MainWindow : Window
             }
 
             ShowLockScreen();
+        });
+    }
+
+    private void OnRemoteTimerStartRequested(int minutes)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (_timerRunning || _lockScreenActive) return;
+
+            _totalMinutes = minutes;
+            _remaining = TimeSpan.FromMinutes(minutes);
+            _notified3Min = false;
+            _notified1Min = false;
+
+            SetupPanel.Visibility = Visibility.Collapsed;
+            TimerPanel.Visibility = Visibility.Visible;
+            TimerRemoteLockUrl.Text = _remoteLockServer?.ServerUrl ?? "";
+            UpdateCountdownDisplay();
+
+            _timerRunning = true;
+            _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _timer.Tick += Timer_Tick;
+            _timer.Start();
+        });
+    }
+
+    private void OnRemoteUnlockRequested()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (!_lockScreenActive || _activeLockScreen == null) return;
+            _activeLockScreen.RemoteUnlock();
+        });
+    }
+
+    private void OnRemoteExtendRequested(int minutes)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (!_timerRunning) return;
+            _remaining += TimeSpan.FromMinutes(minutes);
+            UpdateCountdownDisplay();
         });
     }
 
@@ -334,12 +380,13 @@ public partial class MainWindow : Window
     private void ShowLockScreen()
     {
         _lockScreenActive = true;
-        var lockScreen = new LockScreenWindow(_pin);
-        lockScreen.Show();
+        _activeLockScreen = new LockScreenWindow(_pin);
+        _activeLockScreen.Show();
 
-        lockScreen.Closed += (_, _) =>
+        _activeLockScreen.Closed += (_, _) =>
         {
             _lockScreenActive = false;
+            _activeLockScreen = null;
             _timerRunning = false;
             SetupPanel.Visibility = Visibility.Visible;
             TimerPanel.Visibility = Visibility.Collapsed;

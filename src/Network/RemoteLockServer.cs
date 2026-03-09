@@ -18,6 +18,9 @@ public class RemoteLockServer : IDisposable
     private bool _disposed;
 
     public event Action? LockRequested;
+    public event Action<int>? TimerStartRequested;
+    public event Action? UnlockRequested;
+    public event Action<int>? ExtendRequested;
     public string? ServerUrl { get; private set; }
     public string? LanIpAddress { get; private set; }
     public bool IsRunning { get; private set; }
@@ -114,6 +117,15 @@ public class RemoteLockServer : IDisposable
                 case "/lock":
                     HandleLock(request, response);
                     break;
+                case "/start-timer":
+                    HandleStartTimer(request, response);
+                    break;
+                case "/unlock":
+                    HandleUnlock(request, response);
+                    break;
+                case "/extend":
+                    HandleExtend(request, response);
+                    break;
                 default:
                     response.StatusCode = 404;
                     WriteJson(response, new { error = "Not found" });
@@ -157,6 +169,117 @@ public class RemoteLockServer : IDisposable
             return;
         }
 
+        var (pin, _) = ReadPinFromBody(request);
+        if (!ValidatePin(pin, response)) return;
+
+        LockRequested?.Invoke();
+        WriteJson(response, new { success = true });
+    }
+
+    private void HandleStartTimer(HttpListenerRequest request, HttpListenerResponse response)
+    {
+        if (request.HttpMethod != "POST")
+        {
+            response.StatusCode = 405;
+            WriteJson(response, new { success = false, error = "Method not allowed" });
+            return;
+        }
+
+        var (pin, body) = ReadPinFromBody(request);
+        if (!ValidatePin(pin, response)) return;
+
+        int minutes = 0;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            minutes = doc.RootElement.GetProperty("minutes").GetInt32();
+        }
+        catch { }
+
+        if (minutes < 1 || minutes > 480)
+        {
+            response.StatusCode = 400;
+            WriteJson(response, new { success = false, error = "Minutes must be 1–480" });
+            return;
+        }
+
+        var status = _getStatus();
+        if (status.IsRunning || status.IsLocked)
+        {
+            response.StatusCode = 409;
+            WriteJson(response, new { success = false, error = "Timer already running or screen locked" });
+            return;
+        }
+
+        TimerStartRequested?.Invoke(minutes);
+        WriteJson(response, new { success = true });
+    }
+
+    private void HandleUnlock(HttpListenerRequest request, HttpListenerResponse response)
+    {
+        if (request.HttpMethod != "POST")
+        {
+            response.StatusCode = 405;
+            WriteJson(response, new { success = false, error = "Method not allowed" });
+            return;
+        }
+
+        var (pin, _) = ReadPinFromBody(request);
+        if (!ValidatePin(pin, response)) return;
+
+        var status = _getStatus();
+        if (!status.IsLocked)
+        {
+            response.StatusCode = 409;
+            WriteJson(response, new { success = false, error = "Screen is not locked" });
+            return;
+        }
+
+        UnlockRequested?.Invoke();
+        WriteJson(response, new { success = true });
+    }
+
+    private void HandleExtend(HttpListenerRequest request, HttpListenerResponse response)
+    {
+        if (request.HttpMethod != "POST")
+        {
+            response.StatusCode = 405;
+            WriteJson(response, new { success = false, error = "Method not allowed" });
+            return;
+        }
+
+        var (pin, body) = ReadPinFromBody(request);
+        if (!ValidatePin(pin, response)) return;
+
+        int minutes = 0;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            minutes = doc.RootElement.GetProperty("minutes").GetInt32();
+        }
+        catch { }
+
+        if (minutes < 1 || minutes > 480)
+        {
+            response.StatusCode = 400;
+            WriteJson(response, new { success = false, error = "Minutes must be 1–480" });
+            return;
+        }
+
+        var status = _getStatus();
+        if (!status.IsRunning)
+        {
+            response.StatusCode = 409;
+            WriteJson(response, new { success = false, error = "No timer running" });
+            return;
+        }
+
+        ExtendRequested?.Invoke(minutes);
+        WriteJson(response, new { success = true });
+    }
+
+    private (string? pin, string body) ReadPinFromBody(HttpListenerRequest request)
+    {
         string body;
         using (var reader = new StreamReader(request.InputStream, request.ContentEncoding))
             body = reader.ReadToEnd();
@@ -169,16 +292,19 @@ public class RemoteLockServer : IDisposable
         }
         catch { }
 
+        return (pin, body);
+    }
+
+    private bool ValidatePin(string? pin, HttpListenerResponse response)
+    {
         if (string.IsNullOrEmpty(_pin) || pin != _pin)
         {
             response.StatusCode = 403;
             var error = string.IsNullOrEmpty(_pin) ? "No PIN set. Start a timer on the PC first." : "Wrong PIN";
             WriteJson(response, new { success = false, error });
-            return;
+            return false;
         }
-
-        LockRequested?.Invoke();
-        WriteJson(response, new { success = true });
+        return true;
     }
 
     private static void WriteJson(HttpListenerResponse response, object data)
@@ -241,6 +367,23 @@ public class RemoteLockServer : IDisposable
   .feedback.error { color: #f38ba8; }
   .feedback.success { color: #a6e3a1; }
   .timer-display { font-size: 2.5rem; font-weight: bold; color: #89b4fa; text-align: center; }
+  .duration-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .duration-btn {
+    flex: 1; padding: 10px; font-size: 0.95rem; font-weight: bold;
+    background: #45475a; color: #cdd6f4; border: 2px solid #585b70;
+    border-radius: 8px; cursor: pointer;
+  }
+  .duration-btn.selected { border-color: #89b4fa; background: #585b70; }
+  .duration-btn:active { opacity: 0.7; }
+  .btn-start { background: #a6e3a1; color: #1e1e2e; }
+  .btn-start:disabled { background: #585b70; color: #a6adc8; cursor: default; }
+  .btn-unlock { background: #a6e3a1; color: #1e1e2e; }
+  .btn-unlock:disabled { background: #585b70; color: #a6adc8; cursor: default; }
+  .btn-extend { background: #89b4fa; color: #1e1e2e; }
+  .btn-extend:disabled { background: #585b70; color: #a6adc8; cursor: default; }
+  .section { display: none; }
+  .section.visible { display: block; }
+  .section-title { color: #a6adc8; font-size: 0.85rem; margin-bottom: 8px; }
 </style>
 </head>
 <body>
@@ -256,9 +399,47 @@ public class RemoteLockServer : IDisposable
   <div class="card">
     <input type="password" inputmode="numeric" maxlength="4" pattern="\d{4}"
            class="pin-input" id="pinInput" placeholder="PIN">
-    <button class="btn btn-lock" id="lockBtn" onclick="doLock()">
+
+    <!-- Lock button — always available -->
+    <button class="btn btn-lock" id="lockBtn" onclick="doAction('lock')">
       LOCK SCREEN NOW
     </button>
+
+    <!-- Start timer — only when idle -->
+    <div id="startSection" class="section">
+      <div class="section-title" style="margin-top:12px">Start a timer</div>
+      <div class="duration-row">
+        <button class="duration-btn" onclick="selectMin(10)">10m</button>
+        <button class="duration-btn" onclick="selectMin(20)">20m</button>
+        <button class="duration-btn" onclick="selectMin(30)">30m</button>
+        <button class="duration-btn" onclick="selectMin(60)">1h</button>
+      </div>
+      <button class="btn btn-start" id="startBtn" onclick="doAction('start-timer')">
+        START TIMER
+      </button>
+    </div>
+
+    <!-- Extend — only when timer running -->
+    <div id="extendSection" class="section">
+      <div class="section-title" style="margin-top:12px">Extend time</div>
+      <div class="duration-row">
+        <button class="duration-btn" onclick="selectExtend(5)">+5m</button>
+        <button class="duration-btn" onclick="selectExtend(10)">+10m</button>
+        <button class="duration-btn" onclick="selectExtend(15)">+15m</button>
+        <button class="duration-btn" onclick="selectExtend(30)">+30m</button>
+      </div>
+      <button class="btn btn-extend" id="extendBtn" onclick="doAction('extend')">
+        EXTEND
+      </button>
+    </div>
+
+    <!-- Unlock — only when locked -->
+    <div id="unlockSection" class="section">
+      <button class="btn btn-unlock" id="unlockBtn" onclick="doAction('unlock')" style="margin-top:12px">
+        UNLOCK SCREEN
+      </button>
+    </div>
+
     <div class="feedback" id="feedback"></div>
   </div>
 
@@ -267,19 +448,40 @@ const statusText = document.getElementById('statusText');
 const timerDisplay = document.getElementById('timerDisplay');
 const pcName = document.getElementById('pcName');
 const pinInput = document.getElementById('pinInput');
-const lockBtn = document.getElementById('lockBtn');
 const feedback = document.getElementById('feedback');
+const startSection = document.getElementById('startSection');
+const extendSection = document.getElementById('extendSection');
+const unlockSection = document.getElementById('unlockSection');
+
+let selectedMin = 10;
+let selectedExtend = 10;
+
+function selectMin(m) {
+  selectedMin = m;
+  startSection.querySelectorAll('.duration-btn').forEach((b,i) => {
+    b.classList.toggle('selected', [10,20,30,60][i] === m);
+  });
+}
+
+function selectExtend(m) {
+  selectedExtend = m;
+  extendSection.querySelectorAll('.duration-btn').forEach((b,i) => {
+    b.classList.toggle('selected', [5,10,15,30][i] === m);
+  });
+}
 
 function updateStatus() {
   fetch('/status')
     .then(r => r.json())
     .then(data => {
       pcName.textContent = data.pcName;
-      if (data.locked) {
+      const isLocked = data.locked;
+      const isRunning = data.timerRunning;
+      if (isLocked) {
         statusText.textContent = 'LOCKED';
         statusText.className = 'status-value locked';
         timerDisplay.style.display = 'none';
-      } else if (data.timerRunning) {
+      } else if (isRunning) {
         statusText.textContent = 'Timer running';
         statusText.className = 'status-value';
         timerDisplay.textContent = data.remaining;
@@ -289,6 +491,9 @@ function updateStatus() {
         statusText.className = 'status-value idle';
         timerDisplay.style.display = 'none';
       }
+      startSection.classList.toggle('visible', !isRunning && !isLocked);
+      extendSection.classList.toggle('visible', isRunning && !isLocked);
+      unlockSection.classList.toggle('visible', isLocked);
     })
     .catch(() => {
       statusText.textContent = 'Offline';
@@ -296,24 +501,33 @@ function updateStatus() {
     });
 }
 
-function doLock() {
+function doAction(action) {
   const pin = pinInput.value;
   if (pin.length !== 4) {
     feedback.textContent = 'Enter 4-digit PIN';
     feedback.className = 'feedback error';
     return;
   }
-  lockBtn.disabled = true;
+  const body = { pin };
+  if (action === 'start-timer') body.minutes = selectedMin;
+  if (action === 'extend') body.minutes = selectedExtend;
+
   feedback.textContent = '';
-  fetch('/lock', {
+  fetch('/' + action, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin: pin })
+    body: JSON.stringify(body)
   })
   .then(r => r.json())
   .then(data => {
     if (data.success) {
-      feedback.textContent = 'Screen locked!';
+      const msgs = {
+        'lock': 'Screen locked!',
+        'start-timer': 'Timer started!',
+        'unlock': 'Screen unlocked!',
+        'extend': 'Time extended!'
+      };
+      feedback.textContent = msgs[action] || 'Done!';
       feedback.className = 'feedback success';
       pinInput.value = '';
       updateStatus();
@@ -325,11 +539,12 @@ function doLock() {
   .catch(() => {
     feedback.textContent = 'Connection failed';
     feedback.className = 'feedback error';
-  })
-  .finally(() => { lockBtn.disabled = false; });
+  });
 }
 
-pinInput.addEventListener('keydown', e => { if (e.key === 'Enter') doLock(); });
+pinInput.addEventListener('keydown', e => { if (e.key === 'Enter') doAction('lock'); });
+selectMin(10);
+selectExtend(10);
 updateStatus();
 setInterval(updateStatus, 2000);
 </script>
