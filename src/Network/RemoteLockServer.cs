@@ -32,19 +32,35 @@ public class RemoteLockServer : IDisposable
         _getStatus = getStatus;
     }
 
+    public int ActualPort { get; private set; }
+
     public void Start()
     {
         LanIpAddress = LanHelper.GetLanIPv4Address();
-        ServerUrl = $"http://{LanIpAddress}:{_port}";
-
-        _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://+:{_port}/");
         _cts = new CancellationTokenSource();
 
-        _listener.Start();
-        IsRunning = true;
+        // Try the preferred port, then a few fallbacks
+        for (int offset = 0; offset < 10; offset++)
+        {
+            var port = _port + offset;
+            try
+            {
+                _listener = new HttpListener();
+                _listener.Prefixes.Add($"http://+:{port}/");
+                _listener.Start();
+                ActualPort = port;
+                ServerUrl = $"http://{LanIpAddress}:{port}";
+                IsRunning = true;
+                Task.Run(() => ListenLoop(_cts.Token));
+                return;
+            }
+            catch (HttpListenerException)
+            {
+                try { _listener?.Close(); } catch { }
+            }
+        }
 
-        Task.Run(() => ListenLoop(_cts.Token));
+        throw new InvalidOperationException($"Could not bind to ports {_port}–{_port + 9}");
     }
 
     public void Stop()
