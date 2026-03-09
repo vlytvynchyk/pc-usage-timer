@@ -11,7 +11,6 @@ namespace PcUsageTimer.Network;
 public class RemoteLockServer : IDisposable
 {
     private readonly int _port;
-    private string _pin;
     private readonly Func<TimerStatus> _getStatus;
     private HttpListener? _listener;
     private CancellationTokenSource? _cts;
@@ -25,16 +24,10 @@ public class RemoteLockServer : IDisposable
     public string? LanIpAddress { get; private set; }
     public bool IsRunning { get; private set; }
 
-    public RemoteLockServer(int port, string pin, Func<TimerStatus> getStatus)
+    public RemoteLockServer(int port, Func<TimerStatus> getStatus)
     {
         _port = port;
-        _pin = pin;
         _getStatus = getStatus;
-    }
-
-    public void UpdatePin(string newPin)
-    {
-        _pin = newPin;
     }
 
     public void Start()
@@ -297,10 +290,10 @@ public class RemoteLockServer : IDisposable
 
     private bool ValidatePin(string? pin, HttpListenerResponse response)
     {
-        if (string.IsNullOrEmpty(_pin) || pin != _pin)
+        if (string.IsNullOrEmpty(pin) || !PinManager.HasPin || !PinManager.Validate(pin))
         {
             response.StatusCode = 403;
-            var error = string.IsNullOrEmpty(_pin) ? "No PIN set. Start a timer on the PC first." : "Wrong PIN";
+            var error = !PinManager.HasPin ? "No PIN set. Start a timer on the PC first." : "Wrong PIN";
             WriteJson(response, new { success = false, error });
             return false;
         }

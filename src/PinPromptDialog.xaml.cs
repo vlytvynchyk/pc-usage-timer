@@ -5,11 +5,8 @@ namespace PcUsageTimer;
 
 public partial class PinPromptDialog : Window
 {
-    private readonly string _pin;
-
-    public PinPromptDialog(string pin)
+    public PinPromptDialog()
     {
-        _pin = pin;
         InitializeComponent();
         Loaded += (_, _) => PinEntry.Focus();
     }
@@ -26,7 +23,7 @@ public partial class PinPromptDialog : Window
 
     private void TryConfirm()
     {
-        if (PinEntry.Password == _pin)
+        if (PinManager.Validate(PinEntry.Password))
         {
             DialogResult = true;
             Close();

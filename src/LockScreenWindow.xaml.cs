@@ -11,7 +11,6 @@ namespace PcUsageTimer;
 
 public partial class LockScreenWindow : Window
 {
-    private readonly string _pin;
     private bool _unlocked;
     private IntPtr _hookId = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc;
@@ -44,9 +43,8 @@ public partial class LockScreenWindow : Window
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
-    public LockScreenWindow(string pin)
+    public LockScreenWindow()
     {
-        _pin = pin;
         InitializeComponent();
     }
 
@@ -156,7 +154,7 @@ public partial class LockScreenWindow : Window
 
     private void TryUnlock()
     {
-        if (PinEntry.Password == _pin)
+        if (PinManager.Validate(PinEntry.Password))
         {
             _unlocked = true;
 

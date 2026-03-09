@@ -35,9 +35,6 @@ public partial class MainWindow : Window
     private const string AutoStartRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
     private const string AutoStartValueName = "PcUsageTimer";
 
-    private static readonly string PinFilePath = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "PcUsageTimer", "pin.dat");
 
     public MainWindow()
     {
@@ -126,36 +123,12 @@ public partial class MainWindow : Window
         Application.Current.Shutdown();
     }
 
-    // ── PIN Persistence ──────────────────────────────────────
-
-    private string LoadSavedPin()
-    {
-        try
-        {
-            if (System.IO.File.Exists(PinFilePath))
-                return System.IO.File.ReadAllText(PinFilePath).Trim();
-        }
-        catch { }
-        return "";
-    }
-
-    private void SavePin(string pin)
-    {
-        try
-        {
-            var dir = System.IO.Path.GetDirectoryName(PinFilePath)!;
-            System.IO.Directory.CreateDirectory(dir);
-            System.IO.File.WriteAllText(PinFilePath, pin);
-        }
-        catch { }
-    }
-
     // ── Remote Lock Server ─────────────────────────────────────
 
     private void StartRemoteServer()
     {
-        _pin = LoadSavedPin();
-        _remoteLockServer = new RemoteLockServer(RemotePort, _pin, GetTimerStatus);
+        PinManager.Load();
+        _remoteLockServer = new RemoteLockServer(RemotePort, GetTimerStatus);
         _remoteLockServer.LockRequested += OnRemoteLockRequested;
         _remoteLockServer.TimerStartRequested += OnRemoteTimerStartRequested;
         _remoteLockServer.UnlockRequested += OnRemoteUnlockRequested;
@@ -165,7 +138,7 @@ public partial class MainWindow : Window
         {
             _remoteLockServer.Start();
             var url = _remoteLockServer.ServerUrl ?? "unavailable";
-            RemoteLockStatusText.Text = string.IsNullOrEmpty(_pin)
+            RemoteLockStatusText.Text = !PinManager.HasPin
                 ? "Start a timer once to set your PIN, then open on your phone:"
                 : "Open on your phone:";
             RemoteLockUrlText.Text = url;
@@ -345,9 +318,8 @@ public partial class MainWindow : Window
         _notified3Min = false;
         _notified1Min = false;
 
-        // Update the remote server's PIN and persist it
-        _remoteLockServer?.UpdatePin(_pin);
-        SavePin(_pin);
+        // Persist hashed PIN
+        PinManager.Set(_pin);
 
         SetupPanel.Visibility = Visibility.Collapsed;
         TimerPanel.Visibility = Visibility.Visible;
@@ -437,7 +409,7 @@ public partial class MainWindow : Window
     private void ShowLockScreen()
     {
         _lockScreenActive = true;
-        _activeLockScreen = new LockScreenWindow(_pin);
+        _activeLockScreen = new LockScreenWindow();
         _activeLockScreen.Show();
 
         _activeLockScreen.Closed += (_, _) =>
@@ -458,7 +430,7 @@ public partial class MainWindow : Window
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new PinPromptDialog(_pin) { Owner = this };
+        var dialog = new PinPromptDialog() { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             _timer?.Stop();
