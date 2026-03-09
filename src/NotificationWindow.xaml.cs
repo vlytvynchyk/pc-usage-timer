@@ -9,6 +9,7 @@ namespace PcUsageTimer;
 public partial class NotificationWindow : Window
 {
     private readonly DispatcherTimer _dismissTimer;
+    private bool _persistent;
 
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
@@ -37,7 +38,13 @@ public partial class NotificationWindow : Window
         var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300));
         BeginAnimation(OpacityProperty, fadeIn);
 
-        _dismissTimer.Start();
+        if (!_persistent)
+            _dismissTimer.Start();
+    }
+
+    public void SetPersistent()
+    {
+        _persistent = true;
     }
 
     private void FadeOutAndClose()

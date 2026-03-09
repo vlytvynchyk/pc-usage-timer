@@ -22,6 +22,9 @@ public partial class MainWindow : Window
     private bool _notified1Min;
     private bool _timerRunning;
     private bool _lockScreenActive;
+    private bool _graceActive;
+    private int _graceSeconds;
+    private NotificationWindow? _graceNotification;
     private LockScreenWindow? _activeLockScreen;
 
     private RemoteLockServer? _remoteLockServer;
@@ -357,16 +360,46 @@ public partial class MainWindow : Window
         _timer.Start();
     }
 
+    private const int GracePeriodSeconds = 30;
+
     private void Timer_Tick(object? sender, EventArgs e)
     {
+        if (_graceActive)
+        {
+            _graceSeconds--;
+            CountdownText.Text = $"-{_graceSeconds}s";
+            if (_graceSeconds <= 0)
+            {
+                _graceActive = false;
+                _graceNotification?.Close();
+                _graceNotification = null;
+                _timer?.Stop();
+                ShowLockScreen();
+            }
+            return;
+        }
+
         _remaining -= TimeSpan.FromSeconds(1);
 
         if (_remaining <= TimeSpan.Zero)
         {
             _remaining = TimeSpan.Zero;
-            _timer?.Stop();
             UpdateCountdownDisplay();
-            ShowLockScreen();
+
+            if (_totalMinutes > 1)
+            {
+                // Start grace period
+                _graceActive = true;
+                _graceSeconds = GracePeriodSeconds;
+                _graceNotification = new NotificationWindow("Time's up!", "Save your work — locking in 30 seconds");
+                _graceNotification.SetPersistent();
+                _graceNotification.Show();
+            }
+            else
+            {
+                _timer?.Stop();
+                ShowLockScreen();
+            }
             return;
         }
 
