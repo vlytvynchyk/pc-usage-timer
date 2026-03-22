@@ -16,6 +16,7 @@ public partial class LockScreenWindow : Window
     private DateTime _lockoutUntil = DateTime.MinValue;
     private IntPtr _hookId = IntPtr.Zero;
     private LowLevelKeyboardProc? _hookProc;
+    private DispatcherTimer? _focusTimer;
 
     // Virtual screen bounds (covers all monitors)
     [DllImport("user32.dll")]
@@ -45,6 +46,24 @@ public partial class LockScreenWindow : Window
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetModuleHandle(string? lpModuleName);
 
+    // Taskbar hide/show
+    [DllImport("user32.dll")]
+    private static extern IntPtr FindWindow(string? className, string? windowName);
+
+    [DllImport("user32.dll")]
+    private static extern int ShowWindow(IntPtr hwnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    private const int SW_HIDE = 0;
+    private const int SW_SHOW = 5;
+
+    // Media pause
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    private const byte VK_MEDIA_PLAY_PAUSE = 0xB3;
+
     public LockScreenWindow()
     {
         InitializeComponent();
@@ -57,17 +76,53 @@ public partial class LockScreenWindow : Window
         Top = GetSystemMetrics(SM_YVIRTUALSCREEN);
         Width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
         Height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-        WindowState = WindowState.Normal; // Use manual sizing instead of Maximized
+        WindowState = WindowState.Normal;
 
-        // Mute system audio
+        // Hide taskbar
+        HideTaskbar();
+
+        // Mute system audio and pause media playback
         AudioManager.Mute();
+        keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 0, UIntPtr.Zero);
+        keybd_event(VK_MEDIA_PLAY_PAUSE, 0, 2, UIntPtr.Zero);
 
         // Install low-level keyboard hook to block Win key, Alt+Tab, etc.
         _hookProc = HookCallback;
         _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _hookProc, GetModuleHandle(null), 0);
 
+        // Periodic focus enforcement — catches any brief taskbar/app activation
+        _focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        _focusTimer.Tick += (_, _) =>
+        {
+            if (!_unlocked)
+            {
+                Topmost = true;
+                Activate();
+            }
+        };
+        _focusTimer.Start();
+
         // Focus the PIN entry
         PinEntry.Focus();
+    }
+
+    private static void HideTaskbar()
+    {
+        var taskbar = FindWindow("Shell_TrayWnd", null);
+        if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_HIDE);
+
+        // Also hide the secondary taskbar on multi-monitor setups
+        var secondaryTaskbar = FindWindow("Shell_SecondaryTrayWnd", null);
+        if (secondaryTaskbar != IntPtr.Zero) ShowWindow(secondaryTaskbar, SW_HIDE);
+    }
+
+    private static void ShowTaskbar()
+    {
+        var taskbar = FindWindow("Shell_TrayWnd", null);
+        if (taskbar != IntPtr.Zero) ShowWindow(taskbar, SW_SHOW);
+
+        var secondaryTaskbar = FindWindow("Shell_SecondaryTrayWnd", null);
+        if (secondaryTaskbar != IntPtr.Zero) ShowWindow(secondaryTaskbar, SW_SHOW);
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -79,7 +134,6 @@ public partial class LockScreenWindow : Window
 
             if (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)
             {
-                // Block: Win keys (91, 92), Alt+Tab, Alt+Esc, Ctrl+Esc
                 if (vkCode == 0x5B || vkCode == 0x5C) // LWin, RWin
                     return (IntPtr)1;
                 if (vkCode == 0x09 && (Keyboard.Modifiers & ModifierKeys.Alt) != 0) // Alt+Tab
@@ -95,16 +149,10 @@ public partial class LockScreenWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Block Alt+F4
         if (e.Key == Key.System && e.SystemKey == Key.F4)
-        {
             e.Handled = true;
-        }
-        // Block Alt+Tab at WPF level too
         if (e.Key == Key.Tab && (Keyboard.Modifiers & ModifierKeys.Alt) != 0)
-        {
             e.Handled = true;
-        }
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -112,19 +160,22 @@ public partial class LockScreenWindow : Window
         if (!_unlocked)
         {
             e.Cancel = true;
+            return;
         }
+        Cleanup();
     }
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
         if (!_unlocked)
         {
-            // Force back to foreground
-            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
+            // Immediately reclaim focus
+            Dispatcher.BeginInvoke(DispatcherPriority.Send, () =>
             {
                 Topmost = true;
                 Activate();
                 Focus();
+                PinEntry.Focus();
             });
         }
     }
@@ -132,9 +183,7 @@ public partial class LockScreenWindow : Window
     private void PinEntry_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
-        {
             TryUnlock();
-        }
     }
 
     private void UnlockButton_Click(object sender, RoutedEventArgs e)
@@ -145,13 +194,22 @@ public partial class LockScreenWindow : Window
     public void RemoteUnlock()
     {
         _unlocked = true;
+        Cleanup();
+        Close();
+    }
+
+    private void Cleanup()
+    {
+        _focusTimer?.Stop();
+
         if (_hookId != IntPtr.Zero)
         {
             UnhookWindowsHookEx(_hookId);
             _hookId = IntPtr.Zero;
         }
+
+        ShowTaskbar();
         AudioManager.Unmute();
-        Close();
     }
 
     private void TryUnlock()
@@ -169,17 +227,6 @@ public partial class LockScreenWindow : Window
         {
             _failedAttempts = 0;
             _unlocked = true;
-
-            // Remove keyboard hook
-            if (_hookId != IntPtr.Zero)
-            {
-                UnhookWindowsHookEx(_hookId);
-                _hookId = IntPtr.Zero;
-            }
-
-            // Unmute audio
-            AudioManager.Unmute();
-
             Close();
         }
         else
@@ -198,17 +245,19 @@ public partial class LockScreenWindow : Window
             PinEntry.Password = "";
             PinEntry.Focus();
 
-            // Shake animation
-            var left = Left;
+            // Shake the error text instead of the window (don't move the window!)
+            var origMargin = ErrorText.Margin;
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             int shakeCount = 0;
             timer.Tick += (_, _) =>
             {
-                Left = left + (shakeCount % 2 == 0 ? 10 : -10);
+                ErrorText.Margin = new Thickness(
+                    origMargin.Left + (shakeCount % 2 == 0 ? 8 : -8),
+                    origMargin.Top, origMargin.Right, origMargin.Bottom);
                 shakeCount++;
                 if (shakeCount >= 6)
                 {
-                    Left = left;
+                    ErrorText.Margin = origMargin;
                     timer.Stop();
                 }
             };
