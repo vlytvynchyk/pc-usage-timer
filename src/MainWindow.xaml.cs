@@ -1,7 +1,10 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
@@ -29,7 +32,18 @@ public partial class MainWindow : Window
 
     private RemoteLockServer? _remoteLockServer;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private DarkContextMenuStrip? _trayMenu;
+    private System.Windows.Forms.ToolStripMenuItem? _statusMenuItem;
+    private System.Windows.Forms.ToolStripMenuItem? _startWithWindowsMenuItem;
     private bool _forceClose;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    private static readonly Image BlueDot = CreateStatusDot(Color.FromArgb(58, 130, 246));
+    private static readonly Image GrayDot = CreateStatusDot(Color.FromArgb(130, 130, 130));
+    private static readonly Image CheckImg = CreateCheckImage(Color.FromArgb(100, 180, 255));
+    private static readonly Image Spacer = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
 
     private const int RemotePort = 7742;
     private const string AutoStartRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
@@ -39,6 +53,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        CustomMinutesBox.Text = "20";
         Closing += MainWindow_Closing;
         SetupTrayIcon();
         LoadAutoStartSetting();
@@ -49,17 +64,45 @@ public partial class MainWindow : Window
 
     private void SetupTrayIcon()
     {
-        _trayIcon = new System.Windows.Forms.NotifyIcon
+        _statusMenuItem = new System.Windows.Forms.ToolStripMenuItem("Idle")
         {
-            Text = "PC Usage Timer",
-            Visible = true
+            Enabled = false,
+            Image = GrayDot,
+            Padding = new System.Windows.Forms.Padding(0, 6, 0, 6)
         };
 
-        _trayIcon.Icon = IconGenerator.AppIcon;
+        _startWithWindowsMenuItem = new System.Windows.Forms.ToolStripMenuItem(
+            "Start with Windows", GetCheckImage(AutoStartCheckBox.IsChecked == true), (_, _) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    AutoStartCheckBox.IsChecked = !(AutoStartCheckBox.IsChecked == true);
+                });
+                _startWithWindowsMenuItem!.Image = GetCheckImage(AutoStartCheckBox.IsChecked == true);
+            })
+        {
+            Padding = new System.Windows.Forms.Padding(0, 4, 0, 4)
+        };
 
-        var menu = new System.Windows.Forms.ContextMenuStrip();
-        menu.Items.Add("Open", null, (_, _) => ShowFromTray());
-        menu.Items.Add("Exit", null, (_, _) =>
+        _trayMenu = new DarkContextMenuStrip
+        {
+            Renderer = new DarkMenuRenderer(),
+            ShowImageMargin = true,
+            ShowCheckMargin = false,
+            ImageScalingSize = new System.Drawing.Size(16, 16),
+            BackColor = Color.FromArgb(44, 44, 44),
+            ForeColor = Color.FromArgb(240, 240, 240),
+            MinimumSize = new System.Drawing.Size(0, 0),
+            AutoSize = true
+        };
+
+        _trayMenu.Items.Add(_statusMenuItem);
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        _trayMenu.Items.Add(CreateTrayMenuItem("Open", (_, _) => ShowFromTray()));
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        _trayMenu.Items.Add(_startWithWindowsMenuItem);
+        _trayMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        _trayMenu.Items.Add(CreateTrayMenuItem("Quit", (_, _) =>
         {
             if (_timerRunning)
             {
@@ -70,11 +113,90 @@ public partial class MainWindow : Window
                     System.Windows.Forms.MessageBoxIcon.Warning);
                 return;
             }
+            CloseTrayMenu();
             _forceClose = true;
             Close();
-        });
-        _trayIcon.ContextMenuStrip = menu;
+        }));
+
+        _trayMenu.Opened += (_, _) =>
+        {
+            if (_trayMenu.AutoSize)
+            {
+                _trayMenu.AutoSize = false;
+                _trayMenu.Width = _trayMenu.Width;
+            }
+            _trayMenu.AutoClose = false;
+        };
+        _trayMenu.LostFocus += (_, _) => CloseTrayMenu();
+
+        _trayIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "PC Usage Timer",
+            Visible = true,
+            Icon = IconGenerator.IdleIcon
+        };
+        _trayIcon.MouseClick += OnTrayMouseClick;
         _trayIcon.DoubleClick += (_, _) => ShowFromTray();
+    }
+
+    private void OnTrayMouseClick(object? sender, System.Windows.Forms.MouseEventArgs e)
+    {
+        if (e.Button != System.Windows.Forms.MouseButtons.Right || _trayMenu == null) return;
+
+        var cursor = System.Windows.Forms.Cursor.Position;
+        var screen = System.Windows.Forms.Screen.FromPoint(cursor).WorkingArea;
+
+        _trayMenu.PerformLayout();
+        var preferred = _trayMenu.GetPreferredSize(System.Drawing.Size.Empty);
+        int menuW = Math.Max(preferred.Width, _trayMenu.MinimumSize.Width);
+        int menuH = preferred.Height;
+
+        int x = cursor.X - menuW;
+        int y = screen.Bottom - menuH;
+        if (x < screen.Left) x = screen.Left;
+        if (x + menuW > screen.Right) x = screen.Right - menuW;
+
+        SetForegroundWindow(_trayMenu.Handle);
+        _trayMenu.Show(x, y);
+    }
+
+    private void CloseTrayMenu()
+    {
+        if (_trayMenu == null) return;
+        _trayMenu.AutoClose = true;
+        _trayMenu.Close();
+    }
+
+    private static System.Windows.Forms.ToolStripMenuItem CreateTrayMenuItem(string text, EventHandler handler)
+    {
+        return new System.Windows.Forms.ToolStripMenuItem(text, Spacer, handler)
+        {
+            Padding = new System.Windows.Forms.Padding(0, 4, 0, 4)
+        };
+    }
+
+    private static Image GetCheckImage(bool isChecked) => isChecked ? CheckImg : Spacer;
+
+    private static Image CreateStatusDot(Color color)
+    {
+        var bmp = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.HighQuality;
+        g.Clear(Color.Transparent);
+        using var brush = new SolidBrush(color);
+        g.FillEllipse(brush, 6, 6, 20, 20);
+        return bmp;
+    }
+
+    private static Image CreateCheckImage(Color color)
+    {
+        var bmp = new Bitmap(32, 32, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.HighQuality;
+        g.Clear(Color.Transparent);
+        using var pen = new Pen(color, 3.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        g.DrawLines(pen, [new PointF(6, 16), new PointF(13, 24), new PointF(26, 8)]);
+        return bmp;
     }
 
     private void ShowFromTray()
@@ -82,6 +204,22 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
+            DragMove();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
     }
 
     private void Window_StateChanged(object? sender, EventArgs e)
@@ -109,8 +247,21 @@ public partial class MainWindow : Window
 
         // Actually closing — clean up
         _remoteLockServer?.Dispose();
+        _trayIcon!.Visible = false;
         _trayIcon?.Dispose();
+        _trayMenu?.Dispose();
         Application.Current.Shutdown();
+    }
+
+    private void UpdateTrayIcon()
+    {
+        if (_trayIcon != null)
+            _trayIcon.Icon = _timerRunning ? IconGenerator.ActiveIcon : IconGenerator.IdleIcon;
+        if (_statusMenuItem != null)
+        {
+            _statusMenuItem.Text = _timerRunning ? "Timer running" : "Idle";
+            _statusMenuItem.Image = _timerRunning ? BlueDot : GrayDot;
+        }
     }
 
     // ── Remote Lock Server ─────────────────────────────────────
@@ -202,6 +353,7 @@ public partial class MainWindow : Window
             UpdateCountdownDisplay();
 
             _timerRunning = true;
+            UpdateTrayIcon();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _timer.Tick += Timer_Tick;
             _timer.Start();
@@ -242,6 +394,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RemoteLockHeader_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (RemoteLockDetails.Visibility == Visibility.Collapsed)
+        {
+            RemoteLockDetails.Visibility = Visibility.Visible;
+            RemoteLockChevron.Text = " \u25BC";
+        }
+        else
+        {
+            RemoteLockDetails.Visibility = Visibility.Collapsed;
+            RemoteLockChevron.Text = " \u25B6";
+        }
+    }
+
     private void AutoStartCheckBox_Changed(object sender, RoutedEventArgs e)
     {
         try
@@ -260,6 +426,10 @@ public partial class MainWindow : Window
             }
         }
         catch { }
+
+        // Sync tray menu
+        if (_startWithWindowsMenuItem != null)
+            _startWithWindowsMenuItem.Image = GetCheckImage(AutoStartCheckBox.IsChecked == true);
     }
 
     // ── Timer Setup & Control ──────────────────────────────────
@@ -317,6 +487,7 @@ public partial class MainWindow : Window
         UpdateCountdownDisplay();
 
         _timerRunning = true;
+        UpdateTrayIcon();
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += Timer_Tick;
         _timer.Start();
@@ -407,6 +578,7 @@ public partial class MainWindow : Window
             _lockScreenActive = false;
             _activeLockScreen = null;
             _timerRunning = false;
+            UpdateTrayIcon();
             SetupPanel.Visibility = Visibility.Visible;
             TimerPanel.Visibility = Visibility.Collapsed;
             PinBox.Password = "";
@@ -425,6 +597,7 @@ public partial class MainWindow : Window
         {
             _timer?.Stop();
             _timerRunning = false;
+            UpdateTrayIcon();
             SetupPanel.Visibility = Visibility.Visible;
             TimerPanel.Visibility = Visibility.Collapsed;
         }

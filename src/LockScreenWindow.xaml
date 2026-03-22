@@ -12,8 +12,10 @@
 
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            <!-- Big clock icon -->
-            <TextBlock Text="&#x23F0;" FontSize="100" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+            <!-- Hourglass icon matching the app icon -->
+            <Image Source="Assets/app-icon.png" Width="100" Height="100"
+                   HorizontalAlignment="Center" Margin="0,0,0,20"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
 
             <TextBlock Text="Time's Up!" FontSize="72" FontWeight="Bold"
                        Foreground="#E5484D" HorizontalAlignment="Center"

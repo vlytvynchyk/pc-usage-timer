@@ -7,7 +7,9 @@
         Icon="Assets/app-icon.png"
         Background="#1B1E24"
         FontFamily="Segoe UI"
-        StateChanged="Window_StateChanged">
+        WindowStyle="None" AllowsTransparency="False"
+        StateChanged="Window_StateChanged"
+        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
 
     <Window.Resources>
         <Style x:Key="PresetButton" TargetType="Button">
@@ -109,11 +111,11 @@
                                     CornerRadius="4" BorderThickness="1.5"
                                     BorderBrush="#464B5A" Background="Transparent">
                                 <Path x:Name="CheckMark" Visibility="Collapsed"
-                                      Stroke="White" StrokeThickness="2.2"
+                                      Stroke="White" StrokeThickness="2"
                                       StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                       StrokeLineJoin="Round"
-                                      Data="M4,10 L8,14 L16,5"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                      Data="M3,9 L7,13 L14,4" Width="16" Height="16"
+                                      Stretch="None" Margin="0,1,0,0"/>
                             </Border>
                             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -130,7 +132,54 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="32,20,32,20">
+    <Border BorderBrush="#373C48" BorderThickness="1" CornerRadius="0">
+    <DockPanel>
+        <!-- Custom Title Bar -->
+        <Grid DockPanel.Dock="Top" Height="36" Background="#15171C">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                <Image Source="Assets/app-icon.png" Width="18" Height="18" Margin="0,0,8,0"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                <TextBlock Text="PC Usage Timer" FontSize="12" Foreground="#788296"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="MinimizeBtn" Content="&#xE949;" FontFamily="Segoe MDL2 Assets"
+                        FontSize="10" Width="46" Height="36" Click="MinimizeButton_Click"
+                        Foreground="#788296" Background="Transparent" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#2A2E38"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+                <Button x:Name="CloseBtn" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets"
+                        FontSize="10" Width="46" Height="36" Click="CloseButton_Click"
+                        Foreground="#788296" Background="Transparent" BorderThickness="0" Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#E5484D"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+    <Grid Margin="32,12,32,20">
         <!-- Setup Panel -->
         <StackPanel x:Name="SetupPanel">
             <TextBlock Text="PC Usage Timer" FontSize="20" FontWeight="Bold"
@@ -172,15 +221,22 @@
             <!-- Separator -->
             <Border Height="1" Background="#2A2E38" Margin="0,20,0,16"/>
 
-            <!-- Remote Lock Server Info -->
-            <TextBlock Text="Remote Lock" FontSize="13" FontWeight="Bold"
-                       Foreground="#E6EBF5" Margin="0,0,0,6"/>
-            <TextBlock x:Name="RemoteLockStatusText" FontSize="11" Foreground="#788296"
-                       TextWrapping="Wrap"/>
-            <TextBlock x:Name="RemoteLockUrlText" FontSize="13" Foreground="#3A82F6"
-                       FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
-            <Image x:Name="QrCodeImage" Width="140" Height="140" Margin="0,8,0,0"
-                   HorizontalAlignment="Left"/>
+            <!-- Remote Lock Server Info (expandable) -->
+            <StackPanel Orientation="Horizontal" Cursor="Hand"
+                        MouseLeftButtonUp="RemoteLockHeader_Click">
+                <TextBlock Text="Remote Lock" FontSize="13" FontWeight="Bold"
+                           Foreground="#E6EBF5"/>
+                <TextBlock x:Name="RemoteLockChevron" Text=" &#x25B6;" FontSize="10"
+                           Foreground="#788296" VerticalAlignment="Center" Margin="6,1,0,0"/>
+            </StackPanel>
+            <StackPanel x:Name="RemoteLockDetails" Visibility="Collapsed" Margin="0,6,0,0">
+                <TextBlock x:Name="RemoteLockStatusText" FontSize="11" Foreground="#788296"
+                           TextWrapping="Wrap"/>
+                <TextBlock x:Name="RemoteLockUrlText" FontSize="13" Foreground="#3A82F6"
+                           FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                <Image x:Name="QrCodeImage" Width="140" Height="140" Margin="0,8,0,0"
+                       HorizontalAlignment="Left"/>
+            </StackPanel>
 
             <!-- Separator -->
             <Border Height="1" Background="#2A2E38" Margin="0,16,0,12"/>
@@ -212,4 +268,6 @@
                        FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
         </StackPanel>
     </Grid>
+    </DockPanel>
+    </Border>
 </Window>

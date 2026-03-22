@@ -2,7 +2,11 @@
 
 A simple Windows parental-control app that enforces screen-time limits for kids. Set a duration, walk away, and the PC locks itself when time runs out.
 
-![app-icon](src/Assets/app-icon.png)
+## Screenshots
+
+| Setup | Timer | Lock Screen |
+|-------|-------|-------------|
+| ![Setup](docs/setup.png) | ![Timer](docs/timer.png) | ![Lock Screen](docs/lockscreen.png) |
 
 ## Features
 

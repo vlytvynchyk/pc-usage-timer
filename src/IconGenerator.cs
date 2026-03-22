@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
@@ -7,54 +8,60 @@ namespace PcUsageTimer;
 
 public static class IconGenerator
 {
-    private static Icon? _icon;
+    private static Icon? _idleIcon;
+    private static Icon? _activeIcon;
 
-    public static Icon AppIcon => _icon ??= CreateIcon();
+    public static Icon IdleIcon => _idleIcon ??= CreateTrayIcon(active: false);
+    public static Icon ActiveIcon => _activeIcon ??= CreateTrayIcon(active: true);
 
-    /// <summary>
-    /// Generates a procedural hourglass icon on a 64x64 canvas.
-    /// Style matches UltimatePerformanceToggle's lightning bolt aesthetic:
-    /// white shape on transparent background with clean geometry.
-    /// </summary>
-    private static Icon CreateIcon()
+    private static Icon CreateTrayIcon(bool active)
     {
-        const int size = 64;
+        const int canvasSize = 64;
+        const int dotSize = 18;
+        const int dotMargin = 1;
 
-        using var bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bitmap);
+        using var canvas = new Bitmap(canvasSize, canvasSize, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(canvas);
         g.SmoothingMode = SmoothingMode.HighQuality;
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
         g.InterpolationMode = InterpolationMode.HighQualityBicubic;
         g.Clear(Color.Transparent);
 
+        // Two triangles — simple hourglass, 15% smaller
+        float inset = canvasSize * 0.075f;
+        float s = (canvasSize - inset * 2) / 64f;
         var white = Color.FromArgb(230, 255, 255, 255);
         using var brush = new SolidBrush(white);
-        using var pen = new Pen(white, 3.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round };
 
-        // Hourglass shape — two triangles meeting at center
-        var hourglass = new PointF[]
-        {
-            new(14f,  8f),   // top-left
-            new(50f,  8f),   // top-right
-            new(32f, 32f),   // center pinch
-            new(50f, 56f),   // bottom-right
-            new(14f, 56f),   // bottom-left
-            new(32f, 32f),   // center pinch
-        };
-        g.FillPolygon(brush, hourglass);
+        // Top triangle (pointing down)
+        g.FillPolygon(brush, [
+            new PointF(inset + 10f * s, inset + 4f * s),
+            new PointF(inset + 54f * s, inset + 4f * s),
+            new PointF(inset + 32f * s, inset + 30f * s),
+        ]);
+        // Bottom triangle (pointing up)
+        g.FillPolygon(brush, [
+            new PointF(inset + 10f * s, inset + 60f * s),
+            new PointF(inset + 54f * s, inset + 60f * s),
+            new PointF(inset + 32f * s, inset + 34f * s),
+        ]);
 
-        // Top and bottom bars
-        g.DrawLine(pen, 12f, 8f, 52f, 8f);
-        g.DrawLine(pen, 12f, 56f, 52f, 56f);
+        // Status dot in bottom-right corner
+        int dotX = canvasSize - dotSize - dotMargin;
+        int dotY = canvasSize - dotSize - dotMargin;
 
-        // Small accent dot (blue) in bottom-right — like status indicator
-        var accent = Color.FromArgb(255, 58, 130, 246); // #3A82F6
+        // Dark ring behind dot for contrast
         using var ringBrush = new SolidBrush(Color.FromArgb(200, 0, 0, 0));
-        g.FillEllipse(ringBrush, 43, 43, 22, 22);
-        using var accentBrush = new SolidBrush(accent);
-        g.FillEllipse(accentBrush, 45, 45, 18, 18);
+        g.FillEllipse(ringBrush, dotX - 2, dotY - 2, dotSize + 4, dotSize + 4);
 
-        return BitmapToIcon(bitmap);
+        // Colored dot: blue when timer active, gray when idle
+        var dotColor = active
+            ? Color.FromArgb(255, 58, 130, 246)    // #3A82F6 blue
+            : Color.FromArgb(255, 140, 140, 140);   // gray
+        using var dotBrush = new SolidBrush(dotColor);
+        g.FillEllipse(dotBrush, dotX, dotY, dotSize, dotSize);
+
+        return BitmapToIcon(canvas);
     }
 
     private static Icon BitmapToIcon(Bitmap source)

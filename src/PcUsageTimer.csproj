@@ -18,7 +18,7 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 
     <!-- App metadata -->
-    <Version>1.0.0</Version>
+    <Version>26.3</Version>
     <Authors>PC Usage Timer Contributors</Authors>
     <Product>PC Usage Timer</Product>
     <Description>Parental control app that enforces screen-time limits for kids</Description>

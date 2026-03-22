@@ -6,7 +6,14 @@
       "Bash(rm:*)",
       "Bash(dotnet publish:*)",
       "Bash(dotnet:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(find c:repositorywindows-toolsultimate-performance-toggle -type f -name *.ico -o -name *.png -o -name *.svg)",
+      "Bash(taskkill //F //IM PcUsageTimer.exe)",
+      "Bash(cd:*)",
+      "Bash(mv \"Screenshot 2026-03-22 160132.png\" docs/setup.png)",
+      "Bash(mv \"Screenshot 2026-03-22 155847.png\" docs/timer.png)",
+      "Bash(mv \"Screenshot 2026-03-22 155942.png\" docs/lockscreen.png)"
     ]
   }
 }

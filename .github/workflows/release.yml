@@ -28,7 +28,8 @@ jobs:
         run: dotnet restore
 
       - name: Publish
-        run: dotnet publish -c Release -o ./publish
+        run: dotnet publish -c Release -o ./publish -p:Version=${GITHUB_REF_NAME#v}
+        shell: bash
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
