@@ -357,60 +357,60 @@ public class RemoteLockServer : IDisposable
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #1e1e2e; color: #cdd6f4;
+    background: #1b1e24; color: #e6ebf5;
     min-height: 100vh; display: flex; flex-direction: column;
     align-items: center; padding: 20px;
   }
-  h1 { font-size: 1.5rem; margin-bottom: 8px; color: #89b4fa; }
-  .pc-name { color: #a6adc8; font-size: 0.9rem; margin-bottom: 24px; }
+  h1 { font-size: 1.5rem; margin-bottom: 8px; color: #3a82f6; }
+  .pc-name { color: #788296; font-size: 0.9rem; margin-bottom: 24px; }
   .card {
-    background: #313244; border-radius: 12px; padding: 20px;
+    background: #232739; border: 1px solid #373c48; border-radius: 8px; padding: 20px;
     width: 100%; max-width: 360px; margin-bottom: 16px;
   }
-  .status-label { color: #a6adc8; font-size: 0.85rem; margin-bottom: 4px; }
-  .status-value { font-size: 1.8rem; font-weight: bold; color: #a6e3a1; }
-  .status-value.locked { color: #f38ba8; }
-  .status-value.idle { color: #a6adc8; }
+  .status-label { color: #788296; font-size: 0.85rem; margin-bottom: 4px; }
+  .status-value { font-size: 1.8rem; font-weight: bold; color: #3cb44b; }
+  .status-value.locked { color: #e5484d; }
+  .status-value.idle { color: #788296; }
   .pin-input {
     width: 100%; padding: 14px; font-size: 1.3rem; text-align: center;
-    background: #45475a; color: #cdd6f4; border: 2px solid #585b70;
-    border-radius: 8px; outline: none; letter-spacing: 8px;
+    background: #232739; color: #e6ebf5; border: 1.2px solid #373c48;
+    border-radius: 6px; outline: none; letter-spacing: 8px;
     -webkit-text-security: disc;
   }
-  .pin-input:focus { border-color: #89b4fa; }
-  .pin-input::placeholder { letter-spacing: normal; }
+  .pin-input:focus { border-color: #3a82f6; }
+  .pin-input::placeholder { letter-spacing: normal; color: #788296; }
   .btn {
-    width: 100%; padding: 16px; font-size: 1.1rem; font-weight: bold;
-    border: none; border-radius: 8px; cursor: pointer; margin-top: 12px;
+    width: 100%; padding: 14px; font-size: 1rem; font-weight: bold;
+    border: none; border-radius: 6px; cursor: pointer; margin-top: 12px;
     transition: opacity 0.2s;
   }
   .btn:active { opacity: 0.7; }
-  .btn-lock { background: #f38ba8; color: #1e1e2e; }
-  .btn-lock:disabled { background: #585b70; color: #a6adc8; cursor: default; }
+  .btn-lock { background: #3a82f6; color: white; }
+  .btn-lock:disabled { background: #373c48; color: #788296; cursor: default; }
   .feedback {
     text-align: center; margin-top: 12px; font-size: 0.9rem;
     min-height: 1.2em;
   }
-  .feedback.error { color: #f38ba8; }
-  .feedback.success { color: #a6e3a1; }
-  .timer-display { font-size: 2.5rem; font-weight: bold; color: #89b4fa; text-align: center; }
+  .feedback.error { color: #e5484d; }
+  .feedback.success { color: #3cb44b; }
+  .timer-display { font-size: 2.5rem; font-weight: bold; color: #3a82f6; text-align: center; }
   .duration-row { display: flex; gap: 8px; margin-bottom: 8px; }
   .duration-btn {
-    flex: 1; padding: 10px; font-size: 0.95rem; font-weight: bold;
-    background: #45475a; color: #cdd6f4; border: 2px solid #585b70;
-    border-radius: 8px; cursor: pointer;
+    flex: 1; padding: 10px; font-size: 0.95rem; font-weight: 600;
+    background: #232739; color: #e6ebf5; border: 1.2px solid #373c48;
+    border-radius: 6px; cursor: pointer;
   }
-  .duration-btn.selected { border-color: #89b4fa; background: #585b70; }
+  .duration-btn.selected { border-color: #3a82f6; background: #303e3e; }
   .duration-btn:active { opacity: 0.7; }
-  .btn-start { background: #a6e3a1; color: #1e1e2e; }
-  .btn-start:disabled { background: #585b70; color: #a6adc8; cursor: default; }
-  .btn-unlock { background: #a6e3a1; color: #1e1e2e; }
-  .btn-unlock:disabled { background: #585b70; color: #a6adc8; cursor: default; }
-  .btn-extend { background: #89b4fa; color: #1e1e2e; }
-  .btn-extend:disabled { background: #585b70; color: #a6adc8; cursor: default; }
+  .btn-start { background: #3a82f6; color: white; }
+  .btn-start:disabled { background: #373c48; color: #788296; cursor: default; }
+  .btn-unlock { background: #3a82f6; color: white; }
+  .btn-unlock:disabled { background: #373c48; color: #788296; cursor: default; }
+  .btn-extend { background: #1b1e24; color: #3a82f6; border: 1px solid #3a82f6; }
+  .btn-extend:disabled { background: #373c48; color: #788296; cursor: default; border-color: #373c48; }
   .section { display: none; }
   .section.visible { display: block; }
-  .section-title { color: #a6adc8; font-size: 0.85rem; margin-bottom: 8px; }
+  .section-title { color: #788296; font-size: 0.85rem; margin-bottom: 8px; }
 </style>
 </head>
 <body>

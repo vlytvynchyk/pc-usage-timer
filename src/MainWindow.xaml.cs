@@ -55,17 +55,7 @@ public partial class MainWindow : Window
             Visible = true
         };
 
-        // Use the embedded icon from the exe, fall back to system icon
-        try
-        {
-            var exePath = Environment.ProcessPath;
-            if (exePath != null)
-                _trayIcon.Icon = System.Drawing.Icon.ExtractAssociatedIcon(exePath);
-        }
-        catch
-        {
-            _trayIcon.Icon = SystemIcons.Application;
-        }
+        _trayIcon.Icon = IconGenerator.AppIcon;
 
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add("Open", null, (_, _) => ShowFromTray());
@@ -158,7 +148,7 @@ public partial class MainWindow : Window
             using var qrGenerator = new QRCodeGenerator();
             using var qrData = qrGenerator.CreateQrCode(url, QRCodeGenerator.ECCLevel.M);
             using var qrCode = new BitmapByteQRCode(qrData);
-            var pngBytes = qrCode.GetGraphic(5, [205, 214, 244], [30, 30, 46]);
+            var pngBytes = qrCode.GetGraphic(5, [230, 235, 245], [27, 30, 36]);
 
             var image = new System.Windows.Media.Imaging.BitmapImage();
             using var ms = new System.IO.MemoryStream(pngBytes);
